@@ -1,7 +1,7 @@
 # config.py – Parámetros de configuración del nodo padre (MicroPython)
 
 # Identificador del nodo
-NODE_ID = "18257"
+NODE_ID = "nodo_padre"
 
 # Pines I2C (RTC y BME280)
 I2C_SCL = 22
@@ -16,8 +16,8 @@ UART_RS485_RX = 16
 RS485_DE_RE = 4  # Control dirección del MAX485
 
 # UART para SIM800L (LTE)
-SIM800_TX = 26  # RX del ESP32
-SIM800_RX = 27  # TX del ESP32
+SIM800_TX = 27  # RX del ESP32
+SIM800_RX = 26  # TX del ESP32
 
 # Pines SPI para microSD
 SD_CS = 5
@@ -34,10 +34,10 @@ AP_SSID = "NodoPadre_AP"
 AP_PASSWORD = "12345678"
 
 # URL del servidor al que se envían los datos por LTE
-SERVER_URL = "https://webhook.site/0979b11a-2219-480a-a5b8-f025447ad0e5"
+SERVER_URL = "http://sistemasinteligentes.unimagdalena.edu.co/api/nodes/"
 
 # APN del operador móvil (cambiar según operador)
-APN = "internet.comcel.com.co"
+APN = "internet.claro.com.co"
 
 # Intervalo de medición (en segundos)
 READ_INTERVAL = 30  # 1800 - 30 minutos

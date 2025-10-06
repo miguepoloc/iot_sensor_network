@@ -9,7 +9,7 @@ wlan.active(True)
 
 def connect_wifi(timeout_ms=config.WIFI_TIMEOUT_MS):
     print("[WIFI] Conectando a:", config.WIFI_SSID)
-    wlan.connect(config.WIFI_SSID, config.WIFI_PASSWORD)
+    wlan.connect(config.WIFI_SSID, config.WIFI_PASS)
     
     start = time.ticks_ms()
     while not wlan.isconnected():

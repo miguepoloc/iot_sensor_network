@@ -1,5 +1,6 @@
+import machine
 from machine import I2C, deepsleep, Pin
-import time
+import time, os
 import config
 from wifi_client import connect_wifi, disconnect_wifi
 from http_client import get_remote_time, send_data
@@ -20,85 +21,114 @@ rtc = RTC_DS1307(i2c)
 # Inicializar sistema de reintentos
 init_queue()
 
-# 🌐 Conexión Wi-Fi al nodo padre
-wifi_ok = connect_wifi(config.WIFI_SSID, config.WIFI_PASS, config.WIFI_TIMEOUT_MS)
+# 🌐 Conexión Wi-Fi
+try:
+    wifi_ok = connect_wifi()
+except Exception as e:
+    print("⚠️ Error inicializando Wi-Fi:", e)
+    wifi_ok = False
 
 # ⏱️ Sincronizar hora si hay red
 if wifi_ok:
-    remote_time = get_remote_time()
-    if remote_time:
-        rtc.set_time_from_string(remote_time)
-        print("✅ RTC sincronizado:", remote_time)
-    else:
-        print("⚠️ No se pudo obtener hora del nodo padre")
-else:
-    print("⚠️ Nodo sin Wi-Fi, se usará hora RTC local")
+    try:
+        remote_time = get_remote_time()
+        if remote_time:
+            rtc.set_time_from_string(remote_time)
+            print("✅ RTC sincronizado:", remote_time)
+    except Exception as e:
+        print("⚠️ Error sincronizando RTC:", e)
 
-# 🕒 Timestamp actual
-timestamp = rtc.get_timestamp()
-print("[⏰] Timestamp:", timestamp)
+# Timestamp inicial
+try:
+    timestamp = rtc.get_timestamp()
+except:
+    timestamp = "1970-01-01T00:00:00"
 
 # ⚡ Encender sensores
 power_on_all()
-time.sleep(2)  # estabilización
+print("⏳ Esperando inicialización del CWT Soil...")
+time.sleep(30)  # darle tiempo al sensor a arrancar
 
-# 📏 Lectura de sensores
-hd_sensor = HD38(config.HD38_ADC_PIN)
-hd = hd_sensor.read_percent()
-print("[HD-38] Humedad del suelo:", hd)
+# Instancia CWT
+cwt_sensor = CWT_Soil(
+    tx_pin=config.UART_RS485_TX,
+    rx_pin=config.UART_RS485_RX,
+    de_re_pin=config.RS485_DE_RE,
+    baudrate=4800,
+    addr=1,
+    parity=None
+)
 
-cwt_sensor = CWT_Soil(tx_pin=config.UART_RS485_TX,
-                      rx_pin=config.UART_RS485_RX,
-                      de_re_pin=config.RS485_DE_RE)
-cwt_data = cwt_sensor.read_values()
-print("[CWT] Lectura:", cwt_data)
+# Mantener encendido 5 min tomando lecturas cada 30 s
+start = time.time()
+while time.time() - start < 300:  # 5 min
 
-ambient = read_bme(i2c)
-print("[BME280] Lectura:", ambient)
+    # HD-38
+    hd_sensor = HD38(config.HD38_ADC_PIN)
+    hd_value = hd_sensor.read_percent()
+    soil_hd38 = {"humidity": hd_value}
 
-# 🧩 Unir todos los datos
-soil = {"hd38": hd}
-soil.update(cwt_data)
-
-data = {
-    "id": config.NODE_ID,
-    "timestamp": timestamp,
-    "ambient": ambient,
-    "soil": soil
-}
-
-# 💾 Guardar en SD
-save_json(data, config.PATH_FILE)
-copy_json(data, config.PATH_COPY)
-save_json(data, config.PATH_TOTAL)
-print("💾 Datos almacenados localmente")
-
-# 📡 Reintentos anteriores (si hay red)
-if wifi_ok:
-    print("🔁 Procesando reintentos previos...")
-    process_queue(send_data)
-
-# 📤 Enviar dato actual
-if wifi_ok:
-    try:
-        if send_data(data):
-            print("✅ Datos enviados al nodo padre")
+    # === CWT con reintentos (máx 3) ===
+    soil_cwt = {}
+    for intento in range(3):
+        cwt_data = cwt_sensor.read_all() or {}
+        if all(k in cwt_data and cwt_data[k] is not None 
+               for k in ["humidity","nitrogen","phosphorus","potassium",
+                         "conductivity","pH","salinity","temperature","tds"]):
+            soil_cwt = cwt_data
+            print(f"[CWT] Lectura válida en intento {intento+1}")
+            break
         else:
-            print("⚠️ Fallo en envío actual, se guardará para reintento")
-            enqueue(data, timestamp)
+            print(f"⚠️ [CWT] Datos incompletos en intento {intento+1}, reintentando...")
+            time.sleep(1)
+
+    if not soil_cwt:
+        print("❌ [CWT] No se logró obtener datos completos tras 3 intentos")
+        soil_cwt = {k: None for k in ["humidity","nitrogen","phosphorus",
+                                      "potassium","conductivity","pH",
+                                      "salinity","temperature","tds"]}
+
+    # Ambientales
+    ambient = read_bme(i2c) or {"temp": None, "hum": None, "pres": None}
+
+    # Armar paquete de datos
+    data = {
+        "id": config.NODE_ID,
+        "timestamp": rtc.get_timestamp(),
+        "ambient": ambient,
+        "soil_hd38": soil_hd38,
+        "soil_cwt": soil_cwt
+    }
+
+    # 💾 Guardar en SD
+    try:
+        save_json(data, config.PATH_FILE)
+        copy_json(data, config.PATH_COPY)
+        save_json(data, config.PATH_TOTAL)
+        try: os.sync()
+        except: pass
+        print("💾 Datos almacenados:", data)
     except Exception as e:
-        print("❌ Error al enviar:", e)
-        enqueue(data, timestamp)
-else:
-    print("📂 Sin Wi-Fi: dato guardado para reintento")
-    enqueue(data, timestamp)
+        print("❌ Error guardando:", e)
+
+    # 📡 Intentar envío
+    if wifi_ok:
+        try:
+            if send_data(data):
+                print("✅ Datos enviados al nodo padre")
+            else:
+                enqueue(data, timestamp)
+        except:
+            enqueue(data, timestamp)
+
+    # esperar 30 s antes de la siguiente muestra
+    time.sleep(30)
 
 # 🔌 Apagar sensores y Wi-Fi
 power_off_all()
 disconnect_wifi()
+
+# 😴 Dormir 2 minutos
+print("😴 Deep sleep por 2 min...\n")
 time.sleep(1)
-
-# 😴 Deep Sleep
-print(f"😴 Deep sleep por {config.SAMPLING_TIME_MS // 60000} min...\n")
-deepsleep(config.SAMPLING_TIME_MS)
-
+deepsleep(120000)

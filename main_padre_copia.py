@@ -22,20 +22,12 @@ def send_via_lte(data):
     """
     modem = SIM800L()
     try:
-        ok = modem.send_json(data)  # 📤 Intentar envío
-        if ok:
-            print("[📡] Datos enviados correctamente por LTE")
-            return True
-        else:
-            print("[!] Fallo en envío LTE, se guardará en cola")
-            ts = data.get("timestamp", str(time.time()))
-            enqueue(data, ts)
-            return False
+        modem.send_json(data)  # 📤 Intentar envío
+        print("[📡] Datos enviados correctamente por LTE")
     except Exception as e:
         print("[!] Error al enviar por LTE:", e)
         ts = data.get("timestamp", str(time.time()))
-        enqueue(data, ts)
-        return False
+        enqueue(data, ts)  # Guardar para reintento
 
 # === Manejo de datos recibidos desde hijos ===
 def handle_child_data(data):

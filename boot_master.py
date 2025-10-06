@@ -8,7 +8,6 @@ import time
 import network
 import ntptime
 from rtc_ds1307 import RTC_DS1307
-from machine import Pin, I2C
 import ds1307
 
 print("[BOOT] Preparando pines de control de energía...")
@@ -25,32 +24,23 @@ except Exception as e:
     print("⚠️ Error al configurar pines de relé:", e)
 
 # === 1. Montaje de tarjeta SD ===
-spi = machine.SPI(
-    2,
-    baudrate=400000,
-    polarity=0,
-    phase=0,
-    sck=Pin(config.SPI_SCK),
-    mosi=Pin(config.SPI_MOSI),
-    miso=Pin(config.SPI_MISO)
-)
-cs = Pin(config.SD_CS, Pin.OUT)
+print("[BOOT] Iniciando SPI y montaje de SD...")
+spi = machine.SPI(2, baudrate=1000000, polarity=0, phase=0,
+                  sck=machine.Pin(config.SPI_SCK),
+                  mosi=machine.Pin(config.SPI_MOSI),
+                  miso=machine.Pin(config.SPI_MISO))
+cs = machine.Pin(config.SD_CS, machine.Pin.OUT)
 
-sd_montada = False
-for intento in range(1, 6):  # hasta 5 intentos
-    try:
-        sd = sdcard.SDCard(spi, cs)
-        vfs = os.VfsFat(sd)
-        os.mount(vfs, "/sd")
-        print("✅ SD montada correctamente:", os.listdir("/sd"))
-        sd_montada = True
-        break
-    except Exception as e:
-        print(f"⚠️ Fallo montando SD (intento {intento}/5):", e)
-        time.sleep(1)
-
-if not sd_montada:
-    print("❌ No se pudo montar la SD después de varios intentos")
+try:
+    sd = sdcard.SDCard(spi, cs)
+    vfs = os.VfsFat(sd)
+    os.mount(vfs, "/sd")
+    print("✅ SD montada correctamente:", os.listdir("/sd"))
+except OSError as e:
+    if "timeout" in str(e).lower():
+        print("⚠️ Advertencia: SD montada con retardo, posible respuesta lenta.")
+    else:
+        print(f"[✘] Error OSError al montar la SD: {e}")
 
 # === 2. Sincronización del RTC ===
 def sync_rtc():
@@ -82,4 +72,3 @@ def sync_rtc():
 sync_rtc()
 print("✅ Finalizó boot.py – ejecutando main.py...\n")
 time.sleep(1)
-

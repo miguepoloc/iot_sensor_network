@@ -10,10 +10,10 @@ cwt_power = Pin(config.PIN_CWT_POWER, Pin.OUT)
 def power_on_all():
     """Enciende el sensor CWT (activando relé o MOSFET)"""
     print("⚡ Encendiendo sensor CWT...")
-    cwt_power.on()
-    time.sleep(2)  # Tiempo para estabilizar voltaje
+    cwt_power.off()
+    time.sleep(30)  # Tiempo para estabilizar voltaje
 
 def power_off_all():
     """Apaga el sensor CWT"""
     print("🔌 Apagando sensor CWT...")
-    cwt_power.off()
+    cwt_power.on()

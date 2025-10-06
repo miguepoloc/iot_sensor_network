@@ -1,99 +1,80 @@
-# main.py – Ciclo principal del nodo padre (lectura, almacenamiento, envío y servidor Wi-Fi)
+# main.py – Nodo padre: recibe datos de los hijos, guarda en SD y envía por LTE
 
-from machine import I2C, deepsleep
 import time
 import config
-from hd38 import HD38
-from cwt_soil import CWT_Soil
-from sim800l import SIM800L
-from rtc_ds1307 import RTC_DS1307
+import uasyncio as asyncio
 from sd_utils import append_json
-from bme280 import read_bme
-from wifi_server import start_server, connected_nodes
 from lte_queue import init_queue, enqueue, process_queue
-from power_control import power_on_all, power_off_all
+from wifi_server import start_server
+from sim800l import SIM800L
+import ujson
 
-# 🔧 Inicialización de sensores y periféricos
-print("🚀 Iniciando nodo padre...")
-i2c = I2C(0, scl=config.I2C_SCL, sda=config.I2C_SDA)
-rtc = RTC_DS1307(i2c)
-hd38 = HD38(config.HD38_ADC_PIN)
-cwt = CWT_Soil(
-    tx_pin=config.UART_RS485_TX,
-    rx_pin=config.UART_RS485_RX,
-    de_re_pin=config.RS485_DE_RE
-)
-modem = SIM800L()
+print("🚀 Nodo padre iniciado (modo recepción de hijos)...")
+
+# Inicializar cola de reintentos
 init_queue()
 
-# 🔁 Ciclo de toma de datos único (deep sleep al final)
-def run_cycle():
-    timestamp = rtc.get_timestamp()
-    print("\n[⏰] Timestamp:", timestamp)
-
-    # ⚡ Encender sensores y módulos
-    power_on_all()
-    time.sleep(2)  # estabilización
-
-    # 📏 Lectura de sensores
-    hd = hd38.read_percent()
-    print("[HD-38] Humedad del suelo (%):", hd)
-
-    cwt_raw = cwt.read_values()
-    print("[CWT] Datos recibidos:")
-    for k, v in cwt_raw.items():
-        print(f"   - {k}: {v}")
-
-    ambient = read_bme(i2c)
-    print("[BME280] Lectura ambiental:")
-    for k, v in ambient.items():
-        print(f"   - {k}: {v}")
-
-    # 🧩 Ensamble de datos
-    soil_data = {"hd38": hd}
-    soil_data.update(cwt_raw)
-
-    data = {
-        "id": config.NODE_ID,
-        "timestamp": timestamp,
-        "ambient": ambient,
-        "soil": soil_data,
-        "connected_children": list(connected_nodes)
-    }
-
-    # 💾 Guardar en SD
-    append_json(data, timestamp[:10] + ".json")
-    print("[💾] Datos almacenados en SD")
-
-    # 🔁 Procesar reintentos
-    print("[📡] Procesando cola de reintentos LTE...")
-    process_queue(modem.send_json)
-
-    # 📤 Intentar enviar el dato actual
+# === Función para enviar datos por LTE ===
+def send_via_lte(data):
+    """
+    Intenta enviar un paquete JSON por LTE usando SIM800L.
+    Si el envío falla, almacena los datos en la cola de reintentos (pendientes).
+    """
+    modem = SIM800L()
     try:
-        modem.send_json(data)
-        print("[✉️] Datos enviados correctamente vía LTE")
+        ok = modem.send_json(data)  # 📤 Intentar envío
+        if ok:
+            print("[📡] Datos enviados correctamente por LTE")
+            return True
+        else:
+            print("[!] Fallo en envío LTE, se guardará en cola")
+            ts = data.get("timestamp", str(time.time()))
+            enqueue(data, ts)
+            return False
     except Exception as e:
-        print("[!] Error en envío LTE:", e)
-        enqueue(data, timestamp)
+        print("[!] Error al enviar por LTE:", e)
+        ts = data.get("timestamp", str(time.time()))
+        enqueue(data, ts)
+        return False
 
-    # 🔌 Apagar sensores y periféricos
-    power_off_all()
-    time.sleep(1)
+# === Manejo de datos recibidos desde hijos ===
+def handle_child_data(data):
+    """
+    Recibe datos JSON de un hijo, los muestra en consola,
+    los guarda en SD y luego intenta enviarlos por LTE.
+    """
+    try:
+        # 👀 Mostrar JSON recibido
+        print("\n📥 JSON recibido del hijo:")
+        try:
+            print(ujson.dumps(data))  # en formato compacto
+        except:
+            print(data)  # fallback si falla ujson
 
-    # 😴 Entrar en deep sleep
-    print("😴 Entrando en deep sleep...")
-    deepsleep(config.SLEEP_INTERVAL_MS)
+        # Guardar en SD
+        timestamp = data.get("timestamp", str(time.time()))
+        fname = timestamp[:10] + ".json"  # archivo diario
+        append_json(data, fname)  # 💾 Guardar en SD
+        print(f"[💾] Datos de hijo {data.get('id')} guardados en {fname}")
 
-# 🔧 Servidor Wi-Fi para nodos hijos
-import uasyncio as asyncio
+        # 📡 Intentar envío inmediato por LTE
+        send_via_lte(data)
 
+    except Exception as e:
+        print("❌ Error procesando datos de hijo:", e)
+        enqueue(data, str(time.time()))  # Backup si algo falla
+
+# === Proceso principal ===
 async def main():
-    await start_server()  # Mantiene el servidor activo (aunque deep sleep interrumpe después de un ciclo)
+    # 🚀 Iniciar servidor para recibir datos de hijos
+    server_task = asyncio.create_task(start_server(handle_child_data))
 
-# 🚀 Iniciar ciclo principal y servidor
-run_cycle()
+    # 🔁 Procesar reintentos LTE periódicamente
+    while True:
+        print("[🔁] Revisando cola de reintentos LTE...")
+        process_queue(send_via_lte)  # Reenviar pendientes
+        await asyncio.sleep(60)  # esperar 1 min antes de revisar otra vez
+
+# 🚀 Ejecutar bucle principal
 loop = asyncio.get_event_loop()
 loop.run_until_complete(main())
-
-

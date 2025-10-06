@@ -3,41 +3,36 @@ import os
 
 SD_MOUNT_POINT = "/sd"
 
-def _safe_write(filepath, data):
+def save_json(data, filename):
     """
-    Función interna: asegura escritura física en SD.
+    Guarda un diccionario JSON en un archivo en /sd
+    Si el archivo no existe, lo crea.
     """
     try:
+        filepath = "{}/{}".format(SD_MOUNT_POINT, filename)
         with open(filepath, "a") as f:
             ujson.dump(data, f)
             f.write("\n")
-            f.flush()      # vaciar buffer Python
-        os.sync()          # vaciar buffer del sistema de archivos
-        return True
-    except Exception as e:
-        print("❌ Error al escribir en SD:", e)
-        return False
-
-def save_json(data, filename):
-    """
-    Guarda un diccionario JSON en un archivo en /sd.
-    Si el archivo no existe, lo crea.
-    """
-    filepath = "{}/{}".format(SD_MOUNT_POINT, filename)
-    if _safe_write(filepath, data):
         print("✅ Guardado en:", filepath)
+    except Exception as e:
+        print("❌ Error al guardar en SD:", e)
 
 def copy_json(data, filename):
     """
     Crea una copia secundaria del JSON (como respaldo).
     """
-    filepath = "{}/{}".format(SD_MOUNT_POINT, filename)
-    if _safe_write(filepath, data):
+    try:
+        filepath = "{}/{}".format(SD_MOUNT_POINT, filename)
+        with open(filepath, "a") as f:
+            ujson.dump(data, f)
+            f.write("\n")
         print("🗂️ Copia creada en:", filepath)
+    except Exception as e:
+        print("⚠️ Error en copia de respaldo:", e)
 
 def append_json(data, filename):
     """
-    Equivalente para recibir datos desde nodos hijos (nodo padre).
+    Función equivalente para recibir datos desde nodos hijos (nodo padre).
     """
     save_json(data, filename)
 

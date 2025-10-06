@@ -1,16 +1,16 @@
 # config.py – Configuración del nodo hijo MicroPython (adaptado al nodo padre)
 
 # Identificador del nodo hijo
-NODE_ID = "35"
+NODE_ID = "36"
 
 # Archivos locales en la SD
-PATH_FILE = "CSVnodoHijo_35.json"
-PATH_COPY = "CopiaCSVnodoHijo_35.json"
-PATH_TOTAL = "dataTotal_hijo_35.json"
+PATH_FILE = "CSVnodoHijo_36.json"
+PATH_COPY = "CopiaCSVnodoHijo_36.json"
+PATH_TOTAL = "dataTotal_hijo_36.json"
 
 # Wi-Fi del nodo padre (AP)
 WIFI_SSID = "NodoPadre_AP"
-WIFI_PASS = "12345678"
+WIFI_PASS = ""
 
 # Dirección del servidor (nodo padre en modo AP)
 SERVER_URL = "http://192.168.4.1"
@@ -43,8 +43,8 @@ LED_PIN = 32
 RELAY_CONTROL = 25  # Puede ser para encender LED, u otro control
 
 # Intervalos de muestreo
-SAMPLING_TIME_MS = 3600000       # 1 hora
-WIFI_TIMEOUT_MS = 180000         # 3 minutos
+SAMPLING_TIME_MS = 90000       # 3600000 - 1 hora
+WIFI_TIMEOUT_MS = 90000         #180000 - 3 minutos
 
 
 

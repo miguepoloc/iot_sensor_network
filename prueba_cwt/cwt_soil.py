@@ -89,4 +89,3 @@ class CWT_Soil:
             time.sleep_ms(200)
 
         return results
-
