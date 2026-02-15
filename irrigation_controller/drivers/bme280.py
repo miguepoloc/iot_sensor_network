@@ -1,6 +1,6 @@
 # bme280.py – Adaptador para lectura usando el driver bme280_driver.py
 
-from bme_driver import BME280
+from .bme_driver import BME280
 
 def read_bme(i2c):
     try:
