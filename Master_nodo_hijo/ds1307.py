@@ -1,4 +1,5 @@
-# ds1307.py – Driver para reloj RTC DS1307 compatible con MicroPython
+# ds1307.py - Driver para reloj RTC DS1307 compatible con MicroPython
+
 
 class DS1307:
     def __init__(self, i2c, address=0x68):
@@ -24,12 +25,18 @@ class DS1307:
             return (year, month, day, weekday, hour, minute, second, 0)
         else:
             year, month, day, weekday, hour, minute, second, _ = dt
-            self.i2c.writeto_mem(self.addr, 0x00, bytes([
-                self._dec2bcd(second),
-                self._dec2bcd(minute),
-                self._dec2bcd(hour),
-                self._dec2bcd(weekday),
-                self._dec2bcd(day),
-                self._dec2bcd(month),
-                self._dec2bcd(year - 2000)
-            ]))
+            self.i2c.writeto_mem(
+                self.addr,
+                0x00,
+                bytes(
+                    [
+                        self._dec2bcd(second),
+                        self._dec2bcd(minute),
+                        self._dec2bcd(hour),
+                        self._dec2bcd(weekday),
+                        self._dec2bcd(day),
+                        self._dec2bcd(month),
+                        self._dec2bcd(year - 2000),
+                    ]
+                ),
+            )

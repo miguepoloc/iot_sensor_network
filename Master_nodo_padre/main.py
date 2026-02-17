@@ -1,18 +1,19 @@
-# main.py – Nodo padre: recibe datos de los hijos, guarda en SD y envía por LTE
+# main.py - Nodo padre: recibe datos de los hijos, guarda en SD y envía por LTE
 
+import json
 import time
-import config
+
 import uasyncio as asyncio
+from lte_queue import enqueue, init_queue, process_queue
 from sd_utils import append_json
-from lte_queue import init_queue, enqueue, process_queue
-from wifi_server import start_server
 from sim800l import SIM800L
-import ujson
+from wifi_server import start_server
 
 print("🚀 Nodo padre iniciado (modo recepción de hijos)...")
 
 # Inicializar cola de reintentos
 init_queue()
+
 
 # === Función para enviar datos por LTE ===
 def send_via_lte(data):
@@ -37,6 +38,7 @@ def send_via_lte(data):
         enqueue(data, ts)
         return False
 
+
 # === Manejo de datos recibidos desde hijos ===
 def handle_child_data(data):
     """
@@ -47,8 +49,8 @@ def handle_child_data(data):
         # 👀 Mostrar JSON recibido
         print("\n📥 JSON recibido del hijo:")
         try:
-            print(ujson.dumps(data))  # en formato compacto
-        except:
+            print(json.dumps(data))  # en formato compacto
+        except Exception:
             print(data)  # fallback si falla ujson
 
         # Guardar en SD
@@ -64,16 +66,18 @@ def handle_child_data(data):
         print("❌ Error procesando datos de hijo:", e)
         enqueue(data, str(time.time()))  # Backup si algo falla
 
+
 # === Proceso principal ===
 async def main():
     # 🚀 Iniciar servidor para recibir datos de hijos
-    server_task = asyncio.create_task(start_server(handle_child_data))
+    asyncio.create_task(start_server(handle_child_data))
 
     # 🔁 Procesar reintentos LTE periódicamente
     while True:
         print("[🔁] Revisando cola de reintentos LTE...")
         process_queue(send_via_lte)  # Reenviar pendientes
         await asyncio.sleep(60)  # esperar 1 min antes de revisar otra vez
+
 
 # 🚀 Ejecutar bucle principal
 loop = asyncio.get_event_loop()

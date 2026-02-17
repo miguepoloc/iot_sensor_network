@@ -1,9 +1,11 @@
-# sim800l.py – Comunicación por SIM800L vía comandos AT (POST JSON mejorado)
+# sim800l.py - Comunicación por SIM800L vía comandos AT (POST JSON mejorado)
 
-from machine import UART
+import json
 import time
-import ujson
+
 import config
+from machine import UART
+
 
 class SIM800L:
     def __init__(self):
@@ -26,7 +28,7 @@ class SIM800L:
     def check_network(self):
         """Verifica registro en red y calidad de señal"""
         resp = self.send_cmd("AT+CREG?", 2)
-        if resp and b",1" in resp or b",5" in resp:
+        if (resp and b",1" in resp) or b",5" in resp:
             print("✅ Registrado en red GSM")
         else:
             print("❌ No registrado en red GSM")
@@ -39,7 +41,7 @@ class SIM800L:
 
     def send_json(self, data, retries=3):
         """Envía un JSON por HTTP POST con reintentos"""
-        json_data = ujson.dumps(data)
+        json_data = json.dumps(data)
         for intento in range(1, retries + 1):
             print(f"\n--- Intento {intento} de envío ---")
             try:

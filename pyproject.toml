@@ -1,0 +1,24 @@
+[project]
+name = "irrigation-controller"
+version = "0.1.0"
+description = "MicroPython Irrigation Controller"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "micropython-esp32-stubs>=1.24.0.post1",
+    "pre-commit>=4.0.0",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "PT", "RUF"]
+ignore = []
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true  # For MicroPython modules that might theoretically be missing checking

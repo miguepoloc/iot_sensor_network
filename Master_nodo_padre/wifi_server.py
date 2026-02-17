@@ -1,16 +1,18 @@
-# wifi_server.py – Punto de acceso y servidor HTTP para recibir datos y entregar hora
+# wifi_server.py - Punto de acceso y servidor HTTP para recibir datos y entregar hora
 
+import json
+import time
+
+import config
 import network
 import uasyncio as asyncio
-import json
-import config
-import time
 
 # Configuración del punto de acceso Wi-Fi
 ap = network.WLAN(network.AP_IF)
 ap.active(True)
 ap.config(essid=config.AP_SSID, password=config.AP_PASSWORD)
 print(f"[WIFI] Punto de acceso activado como {config.AP_SSID}")
+
 
 # Iniciar servidor HTTP con callback
 async def start_server(on_data):
@@ -57,7 +59,7 @@ async def start_server(on_data):
             print("[HTTP ERROR]", e)
 
     # Crear servidor asíncrono
-    server = await asyncio.start_server(handle_client, "0.0.0.0", 80)
+    await asyncio.start_server(handle_client, "0.0.0.0", 80)
     print("[HTTP] Servidor iniciado en /data y /hora")
 
     while True:

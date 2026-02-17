@@ -1,7 +1,8 @@
-# http_client.py – Cliente HTTP para sincronizar hora y enviar datos al nodo padre
+# http_client.py - Cliente HTTP para sincronizar hora y enviar datos al nodo padre
 
-import urequests as requests
 import config
+import urequests as requests
+
 
 # Sincroniza hora desde /hora en nodo padre
 def get_remote_time():
@@ -14,7 +15,9 @@ def get_remote_time():
         print("[HORA] Error al obtener hora:", e)
     return None
 
+
 # Envío de datos a /data
+
 
 def send_data(data):
     try:

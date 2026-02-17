@@ -1,14 +1,24 @@
-from machine import UART, Pin
 import time
 
-class CWT_Soil:
-    def __init__(self, tx_pin=17, rx_pin=16, de_re_pin=4, baudrate=4800, addr=1, parity=None):
+import machine
+
+
+class CwtSoil:
+    def __init__(
+        self,
+        tx_pin: int = 17,
+        rx_pin: int = 16,
+        de_re_pin: int = 4,
+        baudrate: int = 4800,
+        addr: int = 1,
+        parity: int | None = None,
+    ):
         self.addr = addr
-        self.uart = UART(2, baudrate=baudrate, bits=8, parity=parity, stop=1, tx=tx_pin, rx=rx_pin)
-        self.control = Pin(de_re_pin, Pin.OUT)
+        self.uart = machine.UART(2, baudrate=baudrate, bits=8, parity=parity, stop=1, tx=tx_pin, rx=rx_pin)
+        self.control = machine.Pin(de_re_pin, machine.Pin.OUT)
         self.control.off()
 
-    def calc_crc(self, data):
+    def calc_crc(self, data: bytes | bytearray) -> bytes:
         crc = 0xFFFF
         for ch in data:
             crc ^= ch
@@ -20,31 +30,31 @@ class CWT_Soil:
                     crc >>= 1
         return bytes([crc & 0xFF, (crc >> 8) & 0xFF])
 
-    def build_request(self, reg, qty=1):
+    def build_request(self, reg: int, qty: int = 1) -> bytearray:
         req = bytearray([self.addr, 0x03, reg >> 8, reg & 0xFF, 0x00, qty])
         req += self.calc_crc(req)
         return req
 
-    def send_request(self, reg, qty=1):
+    def send_request(self, reg: int, qty: int = 1) -> bytes | None:
         cmd = self.build_request(reg, qty)
         self.uart.read()  # limpiar buffer
         self.control.on()
-        time.sleep_ms(2)
+        time.sleep(0.002)  # REPLACE sleep_ms(2)
         self.uart.write(cmd)
         self.uart.flush()
-        time.sleep_ms(5)
+        time.sleep(0.005)  # REPLACE sleep_ms(5)
         self.control.off()
 
         # Esperar respuesta (7 + 2*qty bytes)
         length = 5 + 2 * qty
-        timeout = time.ticks_ms() + 500
+        timeout = time.ticks_ms() + 500  # type: ignore
         resp = b""
-        while time.ticks_ms() < timeout and len(resp) < length:
+        while time.ticks_ms() < timeout and len(resp) < length:  # type: ignore
             if self.uart.any():
                 resp += self.uart.read(1)
         return resp if len(resp) >= length else None
 
-    def parse_response(self, resp):
+    def parse_response(self, resp: bytes | None) -> int | None:
         if not resp or len(resp) < 7:
             return None
         data, crc_rx = resp[:-2], resp[-2:]
@@ -52,7 +62,7 @@ class CWT_Soil:
             return None
         return (resp[3] << 8) | resp[4]
 
-    def read_all(self):
+    def read_all(self) -> dict[str, float | None]:
         """
         Según el datasheet:
         0x0000: Humedad (x0.1 %)
@@ -65,7 +75,7 @@ class CWT_Soil:
         0x0007: Salinidad (mg/L)
         0x0008: TDS (mg/L)
         """
-        results = {}
+        results: dict[str, float | None] = {}
 
         mapping = {
             "humidity": (0x0000, 10.0, "%"),
@@ -79,14 +89,13 @@ class CWT_Soil:
             "tds": (0x0008, 1.0, "mg/L"),
         }
 
-        for key, (reg, scale, unit) in mapping.items():
+        for key, (reg, scale, _unit) in mapping.items():
             resp = self.send_request(reg, 1)
             val = self.parse_response(resp)
             if val is not None:
                 results[key] = val / scale
             else:
                 results[key] = None
-            time.sleep_ms(200)
+            time.sleep(0.2)  # REPLACE sleep_ms(200)
 
         return results
-

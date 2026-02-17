@@ -1,6 +1,6 @@
-import machine
+import json
 import os
-import ujson
+
 
 class DataLogger:
     def __init__(self, sd_driver, mount_point="/sd"):
@@ -17,7 +17,7 @@ class DataLogger:
                 self.is_mounted = True
                 print(f"[SD] Ya montada en {self.mount_point}")
                 return
-            except:
+            except Exception:
                 pass
 
             # Mount
@@ -39,7 +39,7 @@ class DataLogger:
         filepath = f"{self.mount_point}/{filename}"
         try:
             with open(filepath, "a") as f:
-                ujson.dump(data, f)
+                json.dump(data, f)
                 f.write("\n")
             # Sync to ensure physical write
             os.sync()

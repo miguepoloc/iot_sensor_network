@@ -1,15 +1,14 @@
-# boot.py – Configuración inicial del nodo (montaje de microSD y reloj)
+# boot.py - Configuración inicial del nodo (montaje de microSD y reloj)
 
-import machine
 import os
-import sdcard
-import config
 import time
-import network
-import ntptime
-from rtc_ds1307 import RTC_DS1307
-from machine import Pin, I2C
+
+import config
 import ds1307
+import machine
+import ntptime
+import sdcard
+from machine import Pin
 
 print("[BOOT] Preparando pines de control de energía...")
 
@@ -32,7 +31,7 @@ spi = machine.SPI(
     phase=0,
     sck=Pin(config.SPI_SCK),
     mosi=Pin(config.SPI_MOSI),
-    miso=Pin(config.SPI_MISO)
+    miso=Pin(config.SPI_MISO),
 )
 cs = Pin(config.SD_CS, Pin.OUT)
 
@@ -40,8 +39,8 @@ sd_montada = False
 for intento in range(1, 6):  # hasta 5 intentos
     try:
         sd = sdcard.SDCard(spi, cs)
-        vfs = os.VfsFat(sd)
-        os.mount(vfs, "/sd")
+        vfs = os.VfsFat(sd)  # type: ignore
+        os.mount(vfs, "/sd")  # type: ignore
         print("✅ SD montada correctamente:", os.listdir("/sd"))
         sd_montada = True
         break
@@ -51,6 +50,7 @@ for intento in range(1, 6):  # hasta 5 intentos
 
 if not sd_montada:
     print("❌ No se pudo montar la SD después de varios intentos")
+
 
 # === 2. Sincronización del RTC ===
 def sync_rtc():
@@ -63,23 +63,52 @@ def sync_rtc():
         print("🌐 Intentando sincronizar con servidor NTP...")
         ntptime.settime()  # UTC
         utc_time = time.localtime(time.time() + config.TIMEZONE_OFFSET)
-        rtc.datetime((utc_time[0], utc_time[1], utc_time[2], utc_time[6],
-                      utc_time[3], utc_time[4], utc_time[5], 0))
-        ds.datetime((utc_time[0], utc_time[1], utc_time[2], utc_time[6],
-                     utc_time[3], utc_time[4], utc_time[5]))
+        rtc.datetime(
+            (
+                utc_time[0],
+                utc_time[1],
+                utc_time[2],
+                utc_time[6],
+                utc_time[3],
+                utc_time[4],
+                utc_time[5],
+                0,
+            )
+        )
+        ds.datetime(
+            (
+                utc_time[0],
+                utc_time[1],
+                utc_time[2],
+                utc_time[6],
+                utc_time[3],
+                utc_time[4],
+                utc_time[5],
+            )
+        )
         print("✅ Hora sincronizada desde NTP:", utc_time)
-    except Exception as e:
+    except Exception:
         print("⚠️ No se pudo sincronizar por NTP. Intentando cargar desde RTC DS1307...")
         try:
             rtc_time = ds.datetime()
-            rtc.datetime((rtc_time[0], rtc_time[1], rtc_time[2], rtc_time[6],
-                          rtc_time[3], rtc_time[4], rtc_time[5], 0))
+            rtc.datetime(
+                (
+                    rtc_time[0],
+                    rtc_time[1],
+                    rtc_time[2],
+                    rtc_time[6],
+                    rtc_time[3],
+                    rtc_time[4],
+                    rtc_time[5],
+                    0,
+                )
+            )
             print("✅ Hora cargada desde RTC externo:", time.localtime())
         except Exception as e:
             print("❌ Error cargando hora desde RTC DS1307:", e)
 
+
 # Ejecutar sincronización del reloj
 sync_rtc()
-print("✅ Finalizó boot.py – ejecutando main.py...\n")
+print("✅ Finalizó boot.py - ejecutando main.py...\n")
 time.sleep(1)
-

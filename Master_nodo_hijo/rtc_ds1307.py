@@ -1,16 +1,17 @@
-# rtc_ds1307.py – Módulo para manejar RTC DS1307 o DS3231 vía I2C con fallback interno
+# rtc_ds1307.py - Módulo para manejar RTC DS1307 o DS3231 vía I2C con fallback interno
 
-import machine
-from machine import I2C, Pin
-import config
 import time
+
+import config
+from machine import I2C, Pin
 
 try:
     import ds1307
-except:
+except Exception:
     ds1307 = None
 
-class RTC_DS1307:
+
+class RtcDs1307:
     def __init__(self, i2c, addr=0x68):
         self.i2c = i2c
         self.addr = addr
@@ -30,18 +31,14 @@ class RTC_DS1307:
     def get_timestamp(self):
         try:
             if self.available and self.rtc:
-                y, m, d, wd, h, mi, s, _ = self.rtc.datetime()
-                return "{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}".format(
-                    y, m, d, h, mi, s
-                )
+                y, m, d, _, h, mi, s, _ = self.rtc.datetime()
+                return f"{y:04d}-{m:02d}-{d:02d}T{h:02d}:{mi:02d}:{s:02d}"
         except Exception as e:
             print("⚠️ Error leyendo RTC externo:", e)
 
-        # fallback → reloj interno
+        # fallback -> reloj interno
         t = time.localtime()
-        return "{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}".format(
-            t[0], t[1], t[2], t[3], t[4], t[5]
-        )
+        return f"{t[0]:04d}-{t[1]:02d}-{t[2]:02d}T{t[3]:02d}:{t[4]:02d}:{t[5]:02d}"
 
     def set_time(self, y, m, d, h, mi, s):
         if self.available and self.rtc:
@@ -68,8 +65,7 @@ class RTC_DS1307:
         except Exception as e:
             print("❌ Error configurando RTC:", e)
 
+
 def setup_rtc():
     i2c = I2C(0, scl=Pin(config.I2C_SCL), sda=Pin(config.I2C_SDA))
-    return RTC_DS1307(i2c)
-
-    
+    return RtcDs1307(i2c)

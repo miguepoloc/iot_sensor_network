@@ -20,9 +20,9 @@ Example usage on ESP8266:
 
 """
 
-from micropython import const
 import time
 
+from micropython import const
 
 _CMD_TIMEOUT = const(100)
 
@@ -71,7 +71,7 @@ class SDCard:
         self.init_spi(100000)
 
         # clock card at least 100 cycles with cs high
-        for i in range(16):
+        for _ in range(16):
             self.spi.write(b"\xff")
 
         # CMD0: init card; should return _R1_IDLE_STATE (allow 5 attempts)
@@ -116,7 +116,7 @@ class SDCard:
         self.init_spi(baudrate)
 
     def init_card_v1(self):
-        for i in range(_CMD_TIMEOUT):
+        for _ in range(_CMD_TIMEOUT):
             time.sleep_ms(50)
             self.cmd(55, 0, 0)
             if self.cmd(41, 0, 0) == 0:
@@ -127,7 +127,7 @@ class SDCard:
         raise OSError("timeout waiting for v1 card")
 
     def init_card_v2(self):
-        for i in range(_CMD_TIMEOUT):
+        for _ in range(_CMD_TIMEOUT):
             time.sleep_ms(50)
             self.cmd(58, 0, 0, 4)
             self.cmd(55, 0, 0)
@@ -161,7 +161,7 @@ class SDCard:
             self.spi.readinto(self.tokenbuf, 0xFF)
 
         # wait for the response (response[7] == 0)
-        for i in range(_CMD_TIMEOUT):
+        for _ in range(_CMD_TIMEOUT):
             self.spi.readinto(self.tokenbuf, 0xFF)
             response = self.tokenbuf[0]
             if not (response & 0x80):
@@ -170,7 +170,7 @@ class SDCard:
                 if final < 0:
                     self.spi.readinto(self.tokenbuf, 0xFF)
                     final = -1 - final
-                for j in range(final):
+                for _ in range(final):
                     self.spi.write(b"\xff")
                 if release:
                     self.cs(1)
@@ -186,7 +186,7 @@ class SDCard:
         self.cs(0)
 
         # read until start byte (0xff)
-        for i in range(_CMD_TIMEOUT):
+        for _ in range(_CMD_TIMEOUT):
             self.spi.readinto(self.tokenbuf, 0xFF)
             if self.tokenbuf[0] == _TOKEN_DATA:
                 break
@@ -247,7 +247,8 @@ class SDCard:
         self.spi.write(b"\xff")
 
         nblocks = len(buf) // 512
-        assert nblocks and not len(buf) % 512, "Buffer length is invalid"
+        assert nblocks, "Buffer length is invalid"
+        assert not len(buf) % 512, "Buffer length is invalid"
         if nblocks == 1:
             # CMD17: set read address for single block
             if self.cmd(17, block_num * self.cdv, 0, release=False) != 0:
@@ -278,7 +279,8 @@ class SDCard:
         self.spi.write(b"\xff")
 
         nblocks, err = divmod(len(buf), 512)
-        assert nblocks and not err, "Buffer length is invalid"
+        assert nblocks, "Buffer length is invalid"
+        assert not err, "Buffer length is invalid"
         if nblocks == 1:
             # CMD24: set write address for single block
             if self.cmd(24, block_num * self.cdv, 0) != 0:

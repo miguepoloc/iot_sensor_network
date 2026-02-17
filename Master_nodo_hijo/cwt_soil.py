@@ -1,7 +1,9 @@
-from machine import UART, Pin
 import time
 
-class CWT_Soil:
+from machine import UART, Pin
+
+
+class CwtSoil:
     def __init__(self, tx_pin=17, rx_pin=16, de_re_pin=4, baudrate=4800, addr=1, parity=None):
         self.addr = addr
         self.uart = UART(2, baudrate=baudrate, bits=8, parity=parity, stop=1, tx=tx_pin, rx=rx_pin)
@@ -79,7 +81,7 @@ class CWT_Soil:
             "tds": (0x0008, 1.0, "mg/L"),
         }
 
-        for key, (reg, scale, unit) in mapping.items():
+        for key, (reg, scale, _unit) in mapping.items():
             resp = self.send_request(reg, 1)
             val = self.parse_response(resp)
             if val is not None:
@@ -89,4 +91,3 @@ class CWT_Soil:
             time.sleep_ms(200)
 
         return results
-

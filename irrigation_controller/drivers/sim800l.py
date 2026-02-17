@@ -1,32 +1,35 @@
-# sim800l.py – Comunicación por SIM800L vía comandos AT (POST JSON mejorado)
+# sim800l.py Comunicación por SIM800L vía comandos AT (POST JSON mejorado)
 
-from machine import UART
+import json
 import time
-import ujson
+
+import machine
+
+
 class SIM800L:
-    def __init__(self, tx_pin, rx_pin, apn, server_url):
-        self.uart = UART(1, baudrate=9600, tx=tx_pin, rx=rx_pin, timeout=2000)
+    def __init__(self, tx_pin: int, rx_pin: int, apn: str, server_url: str) -> None:
+        self.uart = machine.UART(1, baudrate=9600, tx=tx_pin, rx=rx_pin, timeout=2000)
         self.apn = apn
         self.server_url = server_url
         self.flush()
 
-    def flush(self):
+    def flush(self) -> None:
         while self.uart.any():
             self.uart.read()
 
-    def send_cmd(self, cmd, delay=2):
+    def send_cmd(self, cmd: str, delay: float = 2.0) -> bytes | None:
         """Envia comando AT y retorna respuesta"""
         print(">>", cmd)
         self.uart.write((cmd + "\r\n").encode())
         time.sleep(delay)
-        resp = self.uart.read()
+        resp: bytes | None = self.uart.read()
         print("<<", resp)
         return resp
 
-    def check_network(self):
+    def check_network(self) -> bool:
         """Verifica registro en red y calidad de señal"""
         resp = self.send_cmd("AT+CREG?", 2)
-        if resp and b",1" in resp or b",5" in resp:
+        if resp and (b",1" in resp or b",5" in resp):
             print("✅ Registrado en red GSM")
         else:
             print("❌ No registrado en red GSM")
@@ -37,9 +40,9 @@ class SIM800L:
             print("📶 Señal:", resp)
         return True
 
-    def send_json(self, data, retries=3):
+    def send_json(self, data: dict, retries: int = 3) -> bool:
         """Envía un JSON por HTTP POST con reintentos"""
-        json_data = ujson.dumps(data)
+        json_data = json.dumps(data)
         for intento in range(1, retries + 1):
             print(f"\n--- Intento {intento} de envío ---")
             try:

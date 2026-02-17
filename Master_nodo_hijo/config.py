@@ -1,4 +1,4 @@
-# config.py – Configuración del nodo hijo MicroPython (adaptado al nodo padre)
+# config.py - Configuración del nodo hijo MicroPython (adaptado al nodo padre)
 
 # Identificador del nodo hijo
 NODE_ID = "36"
@@ -43,8 +43,5 @@ LED_PIN = 32
 RELAY_CONTROL = 25  # Puede ser para encender LED, u otro control
 
 # Intervalos de muestreo
-SAMPLING_TIME_MS = 90000       # 3600000 - 1 hora
-WIFI_TIMEOUT_MS = 90000         #180000 - 3 minutos
-
-
-
+SAMPLING_TIME_MS = 90000  # 3600000 - 1 hora
+WIFI_TIMEOUT_MS = 90000  # 180000 - 3 minutos

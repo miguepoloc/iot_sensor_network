@@ -20,9 +20,10 @@ Example usage on ESP8266:
 
 """
 
-from micropython import const
 import time
 
+import machine
+from micropython import const
 
 _CMD_TIMEOUT = const(100)
 
@@ -39,7 +40,7 @@ _TOKEN_DATA = const(0xFE)
 
 
 class SDCard:
-    def __init__(self, spi, cs, baudrate=1320000):
+    def __init__(self, spi: machine.SPI, cs: machine.Pin, baudrate: int = 1320000) -> None:
         self.spi = spi
         self.cs = cs
 
@@ -53,7 +54,7 @@ class SDCard:
         # initialise the card
         self.init_card(baudrate)
 
-    def init_spi(self, baudrate):
+    def init_spi(self, baudrate: int) -> None:
         try:
             master = self.spi.MASTER
         except AttributeError:
@@ -63,7 +64,7 @@ class SDCard:
             # on pyboard
             self.spi.init(master, baudrate=baudrate, phase=0, polarity=0)
 
-    def init_card(self, baudrate):
+    def init_card(self, baudrate: int) -> None:
         # init CS pin
         self.cs.init(self.cs.OUT, value=1)
 
@@ -71,7 +72,7 @@ class SDCard:
         self.init_spi(100000)
 
         # clock card at least 100 cycles with cs high
-        for i in range(16):
+        for _ in range(16):
             self.spi.write(b"\xff")
 
         # CMD0: init card; should return _R1_IDLE_STATE (allow 5 attempts)
@@ -115,9 +116,9 @@ class SDCard:
         # set to high data rate now that it's initialised
         self.init_spi(baudrate)
 
-    def init_card_v1(self):
-        for i in range(_CMD_TIMEOUT):
-            time.sleep_ms(50)
+    def init_card_v1(self) -> None:
+        for _ in range(_CMD_TIMEOUT):
+            time.sleep(50)
             self.cmd(55, 0, 0)
             if self.cmd(41, 0, 0) == 0:
                 # SDSC card, uses byte addressing in read/write/erase commands
@@ -126,9 +127,9 @@ class SDCard:
                 return
         raise OSError("timeout waiting for v1 card")
 
-    def init_card_v2(self):
-        for i in range(_CMD_TIMEOUT):
-            time.sleep_ms(50)
+    def init_card_v2(self) -> None:
+        for _ in range(_CMD_TIMEOUT):
+            time.sleep(50)
             self.cmd(58, 0, 0, 4)
             self.cmd(55, 0, 0)
             if self.cmd(41, 0x40000000, 0) == 0:
@@ -144,7 +145,7 @@ class SDCard:
                 return
         raise OSError("timeout waiting for v2 card")
 
-    def cmd(self, cmd, arg, crc, final=0, release=True, skip1=False):
+    def cmd(self, cmd: int, arg: int, crc: int, final: int = 0, release: bool = True, skip1: bool = False) -> int:
         self.cs(0)
 
         # create and send the command
@@ -161,7 +162,7 @@ class SDCard:
             self.spi.readinto(self.tokenbuf, 0xFF)
 
         # wait for the response (response[7] == 0)
-        for i in range(_CMD_TIMEOUT):
+        for _ in range(_CMD_TIMEOUT):
             self.spi.readinto(self.tokenbuf, 0xFF)
             response = self.tokenbuf[0]
             if not (response & 0x80):
@@ -170,7 +171,7 @@ class SDCard:
                 if final < 0:
                     self.spi.readinto(self.tokenbuf, 0xFF)
                     final = -1 - final
-                for j in range(final):
+                for _ in range(final):
                     self.spi.write(b"\xff")
                 if release:
                     self.cs(1)
@@ -182,15 +183,15 @@ class SDCard:
         self.spi.write(b"\xff")
         return -1
 
-    def readinto(self, buf):
+    def readinto(self, buf: bytearray | memoryview) -> None:
         self.cs(0)
 
         # read until start byte (0xff)
-        for i in range(_CMD_TIMEOUT):
+        for _ in range(_CMD_TIMEOUT):
             self.spi.readinto(self.tokenbuf, 0xFF)
             if self.tokenbuf[0] == _TOKEN_DATA:
                 break
-            time.sleep_ms(1)
+            time.sleep(1)
         else:
             self.cs(1)
             raise OSError("timeout waiting for response")
@@ -208,7 +209,7 @@ class SDCard:
         self.cs(1)
         self.spi.write(b"\xff")
 
-    def write(self, token, buf):
+    def write(self, token: int, buf: bytearray | memoryview) -> None:
         self.cs(0)
 
         # send: start of block, data, checksum
@@ -230,7 +231,7 @@ class SDCard:
         self.cs(1)
         self.spi.write(b"\xff")
 
-    def write_token(self, token):
+    def write_token(self, token: int) -> None:
         self.cs(0)
         self.spi.read(1, token)
         self.spi.write(b"\xff")
@@ -241,13 +242,14 @@ class SDCard:
         self.cs(1)
         self.spi.write(b"\xff")
 
-    def readblocks(self, block_num, buf):
+    def readblocks(self, block_num: int, buf: bytearray) -> None:
         # workaround for shared bus, required for (at least) some Kingston
         # devices, ensure MOSI is high before starting transaction
         self.spi.write(b"\xff")
 
         nblocks = len(buf) // 512
-        assert nblocks and not len(buf) % 512, "Buffer length is invalid"
+        assert nblocks, "Buffer length is invalid"
+        assert not len(buf) % 512, "Buffer length is invalid"
         if nblocks == 1:
             # CMD17: set read address for single block
             if self.cmd(17, block_num * self.cdv, 0, release=False) != 0:
@@ -272,13 +274,14 @@ class SDCard:
             if self.cmd(12, 0, 0xFF, skip1=True):
                 raise OSError(5)  # EIO
 
-    def writeblocks(self, block_num, buf):
+    def writeblocks(self, block_num: int, buf: bytearray) -> None:
         # workaround for shared bus, required for (at least) some Kingston
         # devices, ensure MOSI is high before starting transaction
         self.spi.write(b"\xff")
 
         nblocks, err = divmod(len(buf), 512)
-        assert nblocks and not err, "Buffer length is invalid"
+        assert nblocks, "Buffer length is invalid"
+        assert not err, "Buffer length is invalid"
         if nblocks == 1:
             # CMD24: set write address for single block
             if self.cmd(24, block_num * self.cdv, 0) != 0:
@@ -299,8 +302,9 @@ class SDCard:
                 nblocks -= 1
             self.write_token(_TOKEN_STOP_TRAN)
 
-    def ioctl(self, op, arg):
+    def ioctl(self, op: int, arg: int) -> int:
         if op == 4:  # get number of blocks
             return self.sectors
         if op == 5:  # get block size in bytes
             return 512
+        return 0

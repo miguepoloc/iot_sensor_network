@@ -1,4 +1,4 @@
-# config.py – Parámetros de configuración del nodo padre (MicroPython)
+# config.py - Parámetros de configuración del nodo padre (MicroPython)
 
 # Identificador del nodo
 NODE_ID = "18257"
@@ -8,7 +8,7 @@ I2C_SCL = 22
 I2C_SDA = 21
 
 # Pines ADC (HD-38 analógico)
-HD38_ADC_PIN = 36  # GPIO36 (VP) – ADC1_0
+HD38_ADC_PIN = 36  # GPIO36 (VP) - ADC1_0
 
 # UART para sensor CWT (RS485 Modbus)
 UART_RS485_TX = 17
@@ -27,7 +27,7 @@ SPI_MISO = 19
 
 # Pines para controlar energía (relés o MOSFETs)
 PIN_SIM800L_POWER = 25  # GPIO que enciende el relé del SIM800L
-PIN_CWT_POWER     = 33  # GPIO que enciende el relé del sensor CWT
+PIN_CWT_POWER = 33  # GPIO que enciende el relé del sensor CWT
 
 # Red Wi-Fi (como Access Point para nodos hijos)
 AP_SSID = "NodoPadre_AP"
@@ -43,5 +43,4 @@ APN = "internet.comcel.com.co"
 READ_INTERVAL = 30  # 1800 - 30 minutos
 
 # Frecuencia del LoRa (opcional si se usa LoRa en el futuro)
-LORA_FREQ = 915E6
-
+LORA_FREQ = 915e6
