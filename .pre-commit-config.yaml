@@ -10,4 +10,3 @@ repos:
     hooks:
       - id: mypy
         additional_dependencies: [micropython-esp32-stubs>=1.24.0.post1]
-        exclude: ^(docs/|tests/)
