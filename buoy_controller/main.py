@@ -12,6 +12,8 @@ motor: BaseMotorController = None
 server = None
 sensor_temp = None
 sensor_rtc = None
+sw_top = None
+sw_bottom = None
 mission_active = False  # Evita lanzar dos misiones automáticas al tiempo
 
 
@@ -20,7 +22,7 @@ async def buoy_mission_cycle():
     Corutina principal que controla la inmersión automática
     Baja, espera, toma datos, sube y descansa.
     """
-    global mission_active, sensor_rtd
+    global mission_active, sensor_temp, sensor_rtc, motor, sw_top, sw_bottom
     while True:
         try:
             if not mission_active:
@@ -28,8 +30,19 @@ async def buoy_mission_cycle():
                 print("\n--- [Misión] Iniciando nuevo ciclo automático ---")
 
                 # 1. Bajar Sensores
+                print("[Misión] Bajando sensores hasta tocar fin de carrera fondo (Bottom)...")
                 motor.down()
-                await asyncio.sleep(config.INMERSION_TIME_S)
+
+                # Bucle asíncrono esperando el fin de carrera (asume presionado = 0)
+                timeout_tenths = 0
+                max_tenths = config.MOTOR_TIMEOUT_S
+                while sw_bottom.value() == 1 and timeout_tenths < max_tenths:
+                    await asyncio.sleep_ms(100)
+                    timeout_tenths += 1
+
+                if timeout_tenths >= max_tenths:
+                    print("[Misión] ⚠️ Timeout de seguridad alcanzado al BAJAR!")
+
                 motor.stop()
 
                 # 2. Descansar en el fondo para equilibrar lectura
@@ -42,8 +55,18 @@ async def buoy_mission_cycle():
                 save_data(datos, rtc=sensor_rtc)
 
                 # 4. Subir Sensores y Recoger cable
+                print("[Misión] Subiendo sensores hasta tocar fin de carrera tope (Top)...")
                 motor.up()
-                await asyncio.sleep(config.EXTRACTION_TIME_S)
+
+                # Bucle asíncrono esperando el fin de carrera tope
+                timeout_tenths = 0
+                while sw_top.value() == 1 and timeout_tenths < max_tenths:
+                    await asyncio.sleep_ms(100)
+                    timeout_tenths += 1
+
+                if timeout_tenths >= max_tenths:
+                    print("[Misión] ⚠️ Timeout de seguridad alcanzado al SUBIR!")
+
                 motor.stop()
 
                 print(f"[Misión] Ciclo Terminado. Durmiendo por {config.WAIT_BETWEEN_CYCLES_S}s.")
@@ -75,7 +98,7 @@ async def main():
     """
     Entrypoint Asíncrono
     """
-    global motor, server, sensor_temp, sensor_rtc, i2c
+    global motor, server, sensor_temp, sensor_rtc, i2c, sw_top, sw_bottom
     print("\n==============================")
     print("Iniciando Controlador de Boya")
     print(f"ID Nodo: {config.NODE_ID}")
@@ -111,6 +134,11 @@ async def main():
     except Exception as e:
         print(f"[Setup] Error iniciando sensor temp: {e}")
         sensor_temp = None
+
+    # Iniciar Sensores de Fin de Carrera (Limit Switches)
+    print("[Setup] Inicializando Sensores de Fin de Carrera (Pull-Up)...")
+    sw_top = machine.Pin(config.LIMIT_SWITCH_TOP, machine.Pin.IN, machine.Pin.PULL_UP)
+    sw_bottom = machine.Pin(config.LIMIT_SWITCH_BOTTOM, machine.Pin.IN, machine.Pin.PULL_UP)
 
     # Iniciar servidor (el AP ya fue creado por boot.py en segundo plano)
     server = SimpleWebServer(motor_controller=motor, port=80, sensor=sensor_temp)
